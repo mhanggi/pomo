@@ -41,16 +41,21 @@ fi
 
 #--- Configuration (can be set via environment variables) ---
 
-[[ -n $POMO_FILE ]] && POMO=$POMO_FILE || POMO=$HOME/.local/share/pomo
+[[ -n $POMO_FILE ]] && POMO=$POMO_FILE || POMO=$HOME/.local/share/pomo/stat
 
 [[ -n $POMO_WORK_TIME ]] && WORK_TIME=$POMO_WORK_TIME || WORK_TIME=25
 [[ -n $POMO_BREAK_TIME ]] && BREAK_TIME=$POMO_BREAK_TIME || BREAK_TIME=5
 
 #--- Pomodoro functions ---
 
+function pomo_createfolder {
+    # Creates the folder containing the $POMO file if it does not exist
+    test -e "$(dirname -- "$POMO")" || mkdir "$(dirname -- "$POMO")"
+}
+
 function pomo_start {
     # Start new pomo block (work+break cycle).
-    test -e "$(dirname -- "$POMO")" || mkdir "$(dirname -- "$POMO")"
+    pomo_createfolder
     :> "$POMO" # remove saved time stamp due to a pause.
     touch "$POMO"
 }
@@ -141,9 +146,16 @@ function pomo_clock {
 }
 
 function pomo_status {
+    pomo_createfolder
+
     while true; do
         pomo_clock
-        sleep 1
+
+        if command -v inotifywait &> /dev/null && (pomo_isstopped || pomo_ispaused); then
+            inotifywait --event 'create,modify,delete' --quiet --quiet $(dirname -- "$POMO")
+        else
+            sleep 1
+        fi
     done
 }
 
